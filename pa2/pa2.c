@@ -24,7 +24,6 @@ typedef struct{
 
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 int cli_count;
-int clnt_socks[MAX_CLIENTS]; 
 user users[MAX_CLIENTS];
 int seats[MAX_SEATS];
 int clients[MAX_CLIENTS];
@@ -235,6 +234,7 @@ int main(int argc, char *argv[]){
     if(cli_count == MAX_CLIENTS){
       printf("Max clients.\n");
       close(connFd);
+      continue;
     }
     clients[cli_count++]=connFd;
     pthread_mutex_unlock(&clients_mutex); 
