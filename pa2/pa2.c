@@ -17,7 +17,6 @@ typedef struct _query {
 } query;
 typedef struct{
   int login;
-	int userId;
   int passCode;
   int reserved;
 } user;
@@ -101,39 +100,44 @@ void *handle_client(void *args){
   pthread_exit(NULL);
 }
 int check_login(query *q){
+  int result;
   pthread_mutex_lock(&clients_mutex);
-  if(users[q->user].login == 1 && users[q->user].userId == q->user){
+  if(users[q->user].login == 1 ){
     if(q-> action == 2){
-      return reserve(q);
+      result = reserve(q);
     }else if( q->action == 3){
-      return check_reserve(q);
+      result = check_reserve(q);
     }else if( q->action == 4){
-      return cancel_reserve(q);
+      result = cancel_reserve(q);
     }else if( q-> action ==5){
-      return log_out(q);
+      result = log_out(q);
     }
   }else{
+    result = -1;
     pthread_mutex_unlock(&clients_mutex);
-    return -1;
   }
+  return result;
 }
+
 int login(query *q){
-  pthread_mutex_lock(&clients_mutex);
   int result;
+  pthread_mutex_lock(&clients_mutex);
+  if(users[q->user].login ==1){
+    result = -1;
+  }else{
     if(users[q->user].passCode == -1){
       users[q->user].passCode = q->data;
-      users[q->user].userId=q->user;
       users[q->user].login=1;
       result = 1;
     }else{
       if(users[q->user].passCode == q->data){
-          users[q->user].userId=q->user;
           users[q->user].login=1;
           result = 1;
       }
       else{
         result = -1;
       }
+    }
   }
   pthread_mutex_unlock(&clients_mutex);
   return result;
@@ -181,7 +185,6 @@ int log_out(query *q){
   int result;
   if(users[q->user].login ==1){
     users[q->user].login=-1;
-    users[q->user].userId=-1;
     result = 1;
   }else{
     result = -1;
@@ -210,6 +213,7 @@ int main(int argc, char *argv[]){
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   serv_addr.sin_port = htons(port);
+  
   if (bind(serverSocket, (struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) {
     printf("bind() failed.\n");
     exit(2);
@@ -219,20 +223,22 @@ int main(int argc, char *argv[]){
     exit(3);  
   }
   pthread_t tid;
+  
   while(1){
     clientLen = sizeof(cli_addr);
 		if((connFd = accept(serverSocket, (struct sockaddr*)&cli_addr, (socklen_t *)&clientLen))< 0){
       printf ("accept() failed.\n");
       continue;
     };
+
     pthread_mutex_lock(&clients_mutex);
-    clients[cli_count++]=connFd;
-    if(cli_count == (MAX_CLIENTS+1)){
-      clients[cli_count-1]=0;
+    if(cli_count == MAX_CLIENTS){
       printf("Max clients.\n");
       close(connFd);
     }
-    pthread_mutex_unlock(&clients_mutex);  
+    clients[cli_count++]=connFd;
+    pthread_mutex_unlock(&clients_mutex); 
+    
     pthread_create(&tid, NULL, handle_client,(void *)&connFd);
     pthread_detach(tid);
   
